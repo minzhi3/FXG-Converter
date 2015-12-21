@@ -15,6 +15,21 @@ class FxgToSvg:
         self.svg_root = ET.Element('svg', rootAttr)
         self.fxg_root = ET.parse(path).getroot()
         self.name_key = []
+        self.symbols = dict()
+        self.origin_name = dict()
+
+    def parse_defines(self):
+        for def_node in self.fxg_root.iter():
+            tag = self.remove_namespace(def_node.tag)
+            if tag == 'Definition':
+                name = def_node.attrib['name']
+                self.symbols[name] = list(def_node)
+                print(def_node.attrib)
+                if '{http://ns.adobe.com/flame/2008}originalName' in def_node.attrib:
+                    self.origin_name[name] = def_node.attrib['{http://ns.adobe.com/flame/2008}originalName']
+                else:
+                    self.origin_name[name] = None
+                print('save %s' % name)
 
     def parse_color(self, path_node):
         colors = []
@@ -50,16 +65,10 @@ class FxgToSvg:
         print('parse %s %s' % (self.remove_namespace(fxg_node.tag), svg_node.tag))
         for fxg_child in fxg_node.findall("./*"):
             tag = self.remove_namespace(fxg_child.tag)
-            if tag in ['Graphic', 'Library']:
+            if tag in ['Graphic']:
                 self.parse(fxg_child, svg_node)
-            elif tag == 'Definition':
-                name = fxg_child.attrib['name']
-                if name is not None:
-                    svg_child = ET.Element('defs')
-                    self.parse(fxg_child,svg_child, name)
-                    svg_node.append(svg_child)
-                    self.name_key.append(name)
-                    print('save %s' % name)
+            elif tag in ['Definition','Library']:
+                continue
             elif tag == 'Group':
                 svg_attrib = dict()
                 if id is not None:
@@ -89,12 +98,28 @@ class FxgToSvg:
 
                 svg_child = ET.Element('path', svg_attrib)
                 svg_node.append(svg_child)
-            elif tag in self.name_key:
+            elif tag in self.symbols:
+                print("parse %s" % tag)
                 svg_attrib = dict()
-                svg_attrib['xlink:href'] = '#' + tag
                 transform_string = self.parse_transform(fxg_child.attrib)
                 svg_attrib['transform'] = transform_string
-                svg_child = ET.Element('use', svg_attrib)
+                if tag not in self.symbols:
+                    print(tag)
+                    raise Exception
+
+                symbol_node = self.symbols[tag]
+                print("len of symbol_node %d" % len(symbol_node))
+                if len(symbol_node) > 1 or len(svg_attrib) > 0:
+                    svg_child = ET.Element('g', svg_attrib)
+                    for symbol in symbol_node:
+                        self.parse(symbol, svg_child)
+                elif len(symbol_node) == 1:
+                    temp_root = ET.Element('temp_root')
+                    self.parse(symbol_node[0],temp_root)
+                    svg_child = list(temp_root)[0]
+                    svg_node.append(svg_child)
+                if self.origin_name[tag]:
+                    svg_child.attrib['id'] = self.origin_name[tag]
                 svg_node.append(svg_child)
             elif tag in ['Library', 'Definition']:
                 continue
@@ -103,6 +128,7 @@ class FxgToSvg:
         return
 
     def convert(self):
+        self.parse_defines()
         self.parse(self.fxg_root, self.svg_root)
         return self.svg_root
 
