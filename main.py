@@ -8,10 +8,7 @@ class FxgToSvg:
                     'xmlns:xlink': 'http://www.w3.org/1999/xlink',
                     'preserveAspectRatio': "none",
                     'x': "0px",
-                    'y': "0px",
-                    'width': '720px',
-                    'height': '900px',
-                    'viewBox': '0 0 720 900'}
+                    'y': "0px"}
         self.svg_root = ET.Element('svg', rootAttr)
         self.fxg_root = ET.parse(path).getroot()
         self.name_key = []
@@ -24,7 +21,6 @@ class FxgToSvg:
             if tag == 'Definition':
                 name = def_node.attrib['name']
                 self.symbols[name] = list(def_node)
-                print(def_node.attrib)
                 if '{http://ns.adobe.com/flame/2008}originalName' in def_node.attrib:
                     self.origin_name[name] = def_node.attrib['{http://ns.adobe.com/flame/2008}originalName']
                 else:
@@ -35,11 +31,9 @@ class FxgToSvg:
         colors = []
         fill_node = path_node.find('./*')
         for node in fill_node.findall('./*'):
-            print(ET.tostring(node))
             if self.remove_namespace(node.tag) == 'SolidColor':
                 colors.append(node.attrib['color'])
             else:
-                print(ET.tostring(node))
                 raise Exception
         return colors
 
@@ -48,10 +42,10 @@ class FxgToSvg:
         transform_string = ''
         if 'x' in attribute:
             transform_string += ' translate(%s %s)' % (attribute['x'], attribute['y'])
-        if 'scaleX' in attribute:
-            transform_string += ' scale(%s %s)' % (attribute['scaleX'], attribute['scaleY'])
         if 'rotation' in attribute:
             transform_string += ' rotate(%s)' % attribute['rotation']
+        if 'scaleX' in attribute:
+            transform_string += ' scale(%s %s)' % (attribute['scaleX'], attribute['scaleY'])
         return transform_string
 
     @staticmethod
@@ -119,7 +113,8 @@ class FxgToSvg:
                     svg_child = list(temp_root)[0]
                     svg_node.append(svg_child)
                 if self.origin_name[tag]:
-                    svg_child.attrib['id'] = self.origin_name[tag]
+                    svg_child.attrib['class'] = self.origin_name[tag].replace(' ','')
+                    print(svg_child.attrib['class'])
                 svg_node.append(svg_child)
             elif tag in ['Library', 'Definition']:
                 continue
@@ -132,7 +127,6 @@ class FxgToSvg:
         self.parse(self.fxg_root, self.svg_root)
         return self.svg_root
 
-
-f2s = FxgToSvg('fxg/input.fxg')
+f2s = FxgToSvg('fxg/test.fxg')
 svg_xml = f2s.convert()
-ET.ElementTree(svg_xml).write('svg/output.svg')
+ET.ElementTree(svg_xml).write('svg/test.svg',encoding="UTF-8",xml_declaration=True)
