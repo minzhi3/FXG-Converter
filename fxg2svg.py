@@ -1,4 +1,5 @@
 import xml.etree.ElementTree as ET
+import sys, getopt
 
 
 class FxgToSvg:
@@ -43,14 +44,14 @@ class FxgToSvg:
         # Parse transform information
         transform_string = ''
         if 'x' in attribute or 'y' in attribute:
-            x = attribute.get('x',0)
-            y = attribute.get('y',0)
+            x = attribute.get('x', 0)
+            y = attribute.get('y', 0)
             transform_string += ' translate(%s %s)' % (x, y)
         if 'rotation' in attribute:
             transform_string += ' rotate(%s)' % attribute['rotation']
         if 'scaleX' in attribute or 'scaleY' in attribute:
-            scale_x = attribute.get('scaleX',1)
-            scale_y = attribute.get('scaleY',1)
+            scale_x = attribute.get('scaleX', 1)
+            scale_y = attribute.get('scaleY', 1)
             transform_string += ' scale(%s %s)' % (scale_x, scale_y)
         if len(transform_string) > 0:
             result_attrib['transform'] = transform_string
@@ -140,6 +141,16 @@ class FxgToSvg:
         return self.svg_root
 
 
-f2s = FxgToSvg('fxg/star.fxg')
-svg_xml = f2s.convert()
-ET.ElementTree(svg_xml).write('svg/star.svg', encoding="UTF-8", xml_declaration=True)
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python fxg2svg.py <input file> <output file>")
+        exit(2)
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    f2s = FxgToSvg(input_file)
+    svg_xml = f2s.convert()
+    ET.ElementTree(svg_xml).write(output_file, encoding="UTF-8", xml_declaration=False, method="xml")
+
+
+if __name__ == "__main__":
+    main()
