@@ -38,15 +38,27 @@ class FxgToSvg:
         return colors
 
     @staticmethod
-    def parse_transform(attribute):
+    def parse_attrib(attribute):
+        result_attrib = dict()
+        # Parse transform information
         transform_string = ''
-        if 'x' in attribute:
-            transform_string += ' translate(%s %s)' % (attribute['x'], attribute['y'])
+        if 'x' in attribute or 'y' in attribute:
+            x = attribute.get('x',0)
+            y = attribute.get('y',0)
+            transform_string += ' translate(%s %s)' % (x, y)
         if 'rotation' in attribute:
             transform_string += ' rotate(%s)' % attribute['rotation']
-        if 'scaleX' in attribute:
-            transform_string += ' scale(%s %s)' % (attribute['scaleX'], attribute['scaleY'])
-        return transform_string
+        if 'scaleX' in attribute or 'scaleY' in attribute:
+            scale_x = attribute.get('scaleX',1)
+            scale_y = attribute.get('scaleY',1)
+            transform_string += ' scale(%s %s)' % (scale_x, scale_y)
+        if len(transform_string) > 0:
+            result_attrib['transform'] = transform_string
+
+        # Parse alpha channel
+        if 'alpha' in attribute:
+            result_attrib['opacity'] = attribute['alpha']
+        return result_attrib
 
     @staticmethod
     def remove_namespace(tag):
@@ -61,30 +73,31 @@ class FxgToSvg:
             tag = self.remove_namespace(fxg_child.tag)
             if tag in ['Graphic']:
                 self.parse(fxg_child, svg_node)
-            elif tag in ['Definition','Library']:
+            elif tag in ['Definition', 'Library']:
                 continue
             elif tag == 'Group':
                 svg_attrib = dict()
+                svg_attrib.update(self.parse_attrib(fxg_child.attrib))
+
+                # Parse id
                 if id is not None:
                     svg_attrib['id'] = id
 
-                transform_string = self.parse_transform(fxg_child.attrib)
-                if len(transform_string) > 0:
-                    svg_attrib['transform'] = transform_string
                 svg_child = ET.Element('g', svg_attrib)
                 svg_node.append(svg_child)
                 self.parse(fxg_child, svg_child)
             elif tag == 'Path':
                 svg_attrib = dict()
-                transform_string = self.parse_transform(fxg_child.attrib)
+                svg_attrib.update(self.parse_attrib(fxg_child.attrib))
+
+                # Parse path data
                 path_string = ''
                 if fxg_child.attrib['data']:
                     path_string = fxg_child.attrib['data']
-                colors = self.parse_color(fxg_child)
-                if len(transform_string)>0:
-                    svg_attrib['transform'] = transform_string
                 svg_attrib['d'] = path_string
 
+                # Parse color data
+                colors = self.parse_color(fxg_child)
                 if len(colors) == 1:
                     svg_attrib['fill'] = colors[0]
                 elif len(colors) > 1:
@@ -95,8 +108,7 @@ class FxgToSvg:
             elif tag in self.symbols:
                 print("parse %s" % tag)
                 svg_attrib = dict()
-                transform_string = self.parse_transform(fxg_child.attrib)
-                svg_attrib['transform'] = transform_string
+                svg_attrib.update(self.parse_attrib(fxg_child.attrib))
                 if tag not in self.symbols:
                     print(tag)
                     raise Exception
@@ -109,11 +121,11 @@ class FxgToSvg:
                         self.parse(symbol, svg_child)
                 elif len(symbol_node) == 1:
                     temp_root = ET.Element('temp_root')
-                    self.parse(symbol_node[0],temp_root)
+                    self.parse(symbol_node[0], temp_root)
                     svg_child = list(temp_root)[0]
                     svg_node.append(svg_child)
                 if self.origin_name[tag]:
-                    svg_child.attrib['class'] = self.origin_name[tag].replace(' ','')
+                    svg_child.attrib['class'] = self.origin_name[tag].replace(' ', '')
                     print(svg_child.attrib['class'])
                 svg_node.append(svg_child)
             elif tag in ['Library', 'Definition']:
@@ -127,6 +139,7 @@ class FxgToSvg:
         self.parse(self.fxg_root, self.svg_root)
         return self.svg_root
 
-f2s = FxgToSvg('fxg/test.fxg')
+
+f2s = FxgToSvg('fxg/star.fxg')
 svg_xml = f2s.convert()
-ET.ElementTree(svg_xml).write('svg/test.svg',encoding="UTF-8",xml_declaration=True)
+ET.ElementTree(svg_xml).write('svg/star.svg', encoding="UTF-8", xml_declaration=True)
